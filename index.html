@@ -30,8 +30,8 @@ function logout(){session=null;books=[];localStorage.removeItem('my_audible_sess
 async function refresh(){if(!session?.refresh_token)return false;try{saveSession(await api('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:session.refresh_token},auth:false}));return true}catch{logout();return false}}
 async function authed(path,options){try{return await api(path,options)}catch(e){if(/JWT expired|invalid JWT/i.test(e.message)&&await refresh())return api(path,options);throw e}}
 el('logout').onclick=logout;
-el('authform').onsubmit=async e=>{e.preventDefault();message('authmsg','ログイン中…');try{saveSession(await api('/auth/v1/token?grant_type=password',{method:'POST',body:{email:el('email').value.trim(),password:el('password').value},auth:false}));setAuth(true);await load()}catch(e){message('authmsg',e.message,'error')}};
-el('signup').onclick=async()=>{if(!el('authform').reportValidity())return;message('authmsg','登録中…');el('signup').disabled=true;try{const r=await api('/auth/v1/signup',{method:'POST',body:{email:el('email').value.trim(),password:el('password').value},auth:false});if(r.access_token){saveSession(r);setAuth(true);await load()}else message('authmsg','登録を受け付けました。確認メールが届いたら、メール内のリンクを開いてからログインしてください。','ok')}catch(e){message('authmsg','新規登録エラー: '+e.message,'error')}finally{el('signup').disabled=false}};
+el('authform').onsubmit=async e=>{e.preventDefault();message('authmsg','ログイン中…');try{saveSession(await api('/auth/v1/token?grant_type=password',{method:'POST',body:{email:el('email').value.trim(),password:el('password').value},auth:false}));setAuth(true);await load();await handleSharedAudible()}catch(e){message('authmsg',e.message,'error')}};
+el('signup').onclick=async()=>{if(!el('authform').reportValidity())return;message('authmsg','登録中…');el('signup').disabled=true;try{const r=await api('/auth/v1/signup',{method:'POST',body:{email:el('email').value.trim(),password:el('password').value},auth:false});if(r.access_token){saveSession(r);setAuth(true);await load();await handleSharedAudible()}else message('authmsg','登録を受け付けました。確認メールが届いたら、メール内のリンクを開いてからログインしてください。','ok')}catch(e){message('authmsg','新規登録エラー: '+e.message,'error')}finally{el('signup').disabled=false}};
 async function load(){try{books=await authed('/rest/v1/books?select=*&order=created_at.desc');render();message('notice','')}catch(e){message('notice','読み込みエラー: '+e.message,'error')}}
 function render(){
  let q=el('search').value.trim().toLowerCase(),f=el('filter').value,s=el('sort').value;
@@ -57,10 +57,35 @@ el('autofill').onclick=async()=>{
  }catch(e){message('metamsg','取得できませんでした: '+e.message+'（手入力で登録できます）','error')}
  finally{el('autofill').disabled=false}
 };
+// iOS共有シート／ショートカットから渡されたAudible URLをログイン後に取り込む
+function sharedAudibleUrl(){
+ const value=new URLSearchParams(location.search).get('audible');
+ if(!value)return null;
+ let candidate=value.trim();
+ // 共有テキスト全体が渡された場合もURL部分のみ抽出する
+ const match=candidate.match(/https?:\/\/[^\s<>]+/i);
+ if(match)candidate=match[0].replace(/[）)」』。,]+$/g,'');
+ return audibleId(candidate)?candidate:null;
+}
+function clearSharedParam(){
+ const u=new URL(location.href);u.searchParams.delete('audible');
+ history.replaceState(null,'',u.pathname+u.search+u.hash);
+}
+async function handleSharedAudible(){
+ const value=sharedAudibleUrl();
+ if(!value)return;
+ const id=audibleId(value);
+ const existing=books.find(b=>b.audible_id===id);
+ openBook(existing||null);
+ el('audible').value=value;
+ clearSharedParam();
+ if(existing){message('metamsg','この本はすでに本棚に登録されています。既存の登録内容を表示しました。','ok');return}
+ el('autofill').click();
+}
 el('add').onclick=()=>openBook();el('cancel').onclick=()=>el('overlay').classList.add('hidden');
 el('bookform').onsubmit=async e=>{e.preventDefault();message('savemsg','保存中…');let url=el('audible').value.trim(),id=url?audibleId(url):null;if(url&&!id){message('savemsg','Audibleの共有URLを確認してください。');return}
  const data={title:el('title').value.trim(),audible_id:id,audible_url:id?'https://www.audible.co.jp/pd/'+id:null,authors:el('authors').value.split(/[,、]/).map(s=>s.trim()).filter(Boolean),narrators:el('narrators').value.split(/[,、]/).map(s=>s.trim()).filter(Boolean),genre:el('genre').value.trim()||null,finished_on:el('finished').value||null,cover_url:el('cover').value.trim()||null,description:el('description').value.trim()||null,rating:el('rating').value?Number(el('rating').value):null,favorite:el('favorite').checked,notes:el('notes').value.trim()||null};
  try{if(editing){let r=await authed('/rest/v1/books?id=eq.'+encodeURIComponent(editing.id)+'&revision=eq.'+editing.revision,{method:'PATCH',body:data,prefer:'return=representation'});if(!r.length)throw Error('他の端末で更新されています。再読み込みしてください。')}else{data.user_id=session.user.id;await authed('/rest/v1/books',{method:'POST',body:data,prefer:'return=representation'})}el('overlay').classList.add('hidden');await load()}catch(e){message('savemsg',e.message,'error')}};
 el('delete').onclick=async()=>{if(!editing||!confirm('この書籍を削除しますか？'))return;try{let r=await authed('/rest/v1/books?id=eq.'+editing.id+'&revision=eq.'+editing.revision,{method:'DELETE',prefer:'return=representation'});if(!r.length)throw Error('他の端末で変更されています。再読み込みしてください。');el('overlay').classList.add('hidden');await load()}catch(e){message('savemsg',e.message,'error')}};
-(async()=>{try{session=JSON.parse(localStorage.getItem('my_audible_session')||'null');if(session?.refresh_token&&await refresh()){setAuth(true);await load()}else setAuth(false)}catch{logout()}})();
+(async()=>{try{session=JSON.parse(localStorage.getItem('my_audible_session')||'null');if(session?.refresh_token&&await refresh()){setAuth(true);await load();await handleSharedAudible()}else setAuth(false)}catch{logout()}})();
 </script></body></html>
