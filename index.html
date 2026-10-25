@@ -95,6 +95,16 @@ main{max-width:1320px}
  .grid.list-mode .quickratings,.grid.detail-mode .quickratings{grid-column:2;grid-row:auto;margin-top:4px}
 }
 @media(max-width:380px){.quickratingrow .quickscore{font-size:11px;padding:7px 1px}}
+
+.quickratings{display:grid;grid-template-columns:1fr;gap:5px;align-content:start}
+.quickratings .quickscore{width:100%;min-height:40px}
+.quickratings .quickratinglabel{margin:5px 0 0}
+.cycle-score{transition:background .12s ease,border-color .12s ease}
+.cycle-score.positive{background:#e6f2eb;color:#17643d;border-color:#98c8ac}
+.cycle-score.negative{background:#f5eceb;color:#88443f;border-color:#dec1bd}
+.detailchoices{display:block}
+.detailchoices .cycle-score{width:100%;text-align:center;min-height:48px}
+@media(min-width:701px){.grid.list-mode .quickratings,.grid.detail-mode .quickratings{grid-column:3}}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
@@ -118,10 +128,10 @@ main{max-width:1320px}
 <div class="detailfield"><strong>カテゴリ / サブカテゴリ</strong><div id="detailCategories" class="categorybuttons"></div></div>
 </div></div>
 <div class="detailfield"><strong>作品の評価</strong>
-<div class="detailchoices" data-detail-choice="listen_again"><button type="button" data-score="yes">↻ また聴きたい</button><button type="button" data-score="no">✓ 一度で十分</button></div></div>
+<div class="detailchoices" data-detail-choice="listen_again"><button type="button" class="cycle-score" data-cycle-field="listen_again">未評価</button></div></div>
 <div class="detailfield"><strong>ナレーションの評価</strong>
-<div class="detailchoices" data-detail-choice="narrator_liked"><button type="button" data-score="yes">👍 好き</button><button type="button" data-score="no">👎 好みではない</button></div></div>
-<p id="detailScoreMessage" class="muted" role="status" aria-live="polite">選択済みをもう一度押すと未評価に戻ります。変更は自動保存されます。</p>
+<div class="detailchoices" data-detail-choice="narrator_liked"><button type="button" class="cycle-score" data-cycle-field="narrator_liked">未評価</button></div></div>
+<p id="detailScoreMessage" class="muted" role="status" aria-live="polite">タップするたびに「肯定 → 否定 → 未評価」と変わり、自動保存されます。</p>
 <div class="detailsection"><h3>概要</h3><div id="detailDescription" class="muted"></div></div>
 
 <div class="actions" style="margin-top:22px"><button type="button" class="alt hidden" id="detailAudible">Audibleで開く</button><button type="button" id="detailEdit">編集</button></div>
@@ -228,13 +238,9 @@ function render(){
  el('authorFilter').classList.toggle('hidden',!selectedAuthor);el('authorFilterText').textContent=selectedAuthor?'著者：'+selectedAuthor+'（'+list.length+'冊）':'';el('groupActive').classList.toggle('hidden',!selectedGroup);el('groupActiveText').textContent=selectedGroup?'表示用グループ：'+selectedGroup+'（'+list.length+'冊）':'';el('categoryActive').classList.toggle('hidden',!selectedCategory);el('categoryActiveText').textContent=selectedCategory?'カテゴリ：'+selectedCategory+'（'+list.length+'冊）':'';message('count',books.length+'冊 登録済み');el('empty').classList.toggle('hidden',list.length>0);
  el('books').className='grid'+(viewMode==='list'?' list-mode':viewMode==='detail'?' detail-mode':'');
  document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===viewMode;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active))});
- const scoreButton=(book,field,desired,label)=>{
-  const selected=book[field]===desired;
-  return '<button type="button" class="quickscore'+(selected?' selected':'')+'" data-quick-field="'+field+'" data-quick-value="'+(desired?'yes':'no')+'" aria-pressed="'+selected+'" aria-label="'+escapeHTML(book.title+'：'+label+(selected?'（選択中。もう一度押すと解除）':''))+'">'+label+'</button>';
- };
  const quickScores=book=>'<div class="quickratings" aria-label="作品とナレーターの評価">'+
-  '<div class="quickratinglabel">作品（また聴きたい？）</div><div class="quickratingrow">'+scoreButton(book,'listen_again',true,'↻ また聴く')+scoreButton(book,'listen_again',false,'✓ 一度で十分')+'</div>'+
-  '<div class="quickratinglabel">ナレーション</div><div class="quickratingrow">'+scoreButton(book,'narrator_liked',true,'👍 好き')+scoreButton(book,'narrator_liked',false,'👎 好みでない')+'</div></div>';
+  '<div class="quickratinglabel">作品</div><button type="button" class="quickscore cycle-score" data-quick-field="listen_again" aria-label="'+escapeHTML(book.title+'：作品の評価 '+ratingLabel('listen_again',book.listen_again))+'">'+escapeHTML(ratingLabel('listen_again',book.listen_again))+'</button>'+
+  '<div class="quickratinglabel">ナレーション</div><button type="button" class="quickscore cycle-score" data-quick-field="narrator_liked" aria-label="'+escapeHTML(book.title+'：ナレーションの評価 '+ratingLabel('narrator_liked',book.narrator_liked))+'">'+escapeHTML(ratingLabel('narrator_liked',book.narrator_liked))+'</button></div>';
  el('books').innerHTML=list.map(b=>'<article class="book" role="button" tabindex="0" aria-label="'+escapeHTML(b.title)+'の詳細を開く" data-id="'+escapeHTML(b.id)+'">'+
  (b.cover_url?'<img class="cover" loading="lazy" src="'+escapeHTML(b.cover_url)+'" alt="">':'<div class="cover placeholder">表紙なし</div>')+
  '<div class="bookname">'+escapeHTML(b.title)+'</div><div class="muted">'+(b.authors||[]).map(a=>'<button type="button" class="authorlink" data-author="'+escapeHTML(a)+'">'+escapeHTML(a)+'</button>').join('、')+'</div>'+
@@ -255,7 +261,7 @@ function render(){
   e.stopPropagation();
   const card=btn.closest('.book'),book=books.find(x=>x.id===card?.dataset.id);
   if(!book||quickRatingPending.has(book.id))return;
-  const field=btn.dataset.quickField,desired=btn.dataset.quickValue==='yes',next=book[field]===desired?null:desired;
+  const field=btn.dataset.quickField,next=nextRating(book[field]);
   quickRatingPending.add(book.id);
   card.querySelectorAll('.quickscore').forEach(x=>x.disabled=true);
   try{
@@ -286,23 +292,28 @@ function filterAuthor(name){
  render();window.scrollTo({top:0,behavior:'smooth'});
 }
 el('clearAuthor').onclick=()=>{selectedAuthor=null;render()};
+function nextRating(value){return value===true?false:value===false?null:true}
+function ratingLabel(field,value){
+ if(field==='listen_again')return value===true?'↻ また聴く':value===false?'✓ 一度で十分':'－ 未評価';
+ return value===true?'👍 好き':value===false?'👎 好みでない':'－ 未評価';
+}
 function updateDetailChoices(book){
- for(const group of document.querySelectorAll('[data-detail-choice]')){
-  const value=book[group.dataset.detailChoice];
-  for(const btn of group.querySelectorAll('[data-score]')){
-   const selected=value===(btn.dataset.score==='yes');
-   btn.classList.toggle('selected',selected);btn.setAttribute('aria-pressed',String(selected));
-  }
+ for(const button of document.querySelectorAll('[data-cycle-field]')){
+  const field=button.dataset.cycleField;
+  button.textContent=ratingLabel(field,book[field]);
+  button.classList.toggle('positive',book[field]===true);
+  button.classList.toggle('negative',book[field]===false);
+  button.classList.toggle('unrated',book[field]===null||book[field]===undefined);
+  button.setAttribute('aria-label',ratingLabel(field,book[field])+'。タップして次の評価へ');
  }
- message('detailScoreMessage','選択済みをもう一度押すと未評価に戻ります。変更は自動保存されます。');
+ message('detailScoreMessage','タップするたびに「肯定 → 否定 → 未評価」と変わり、自動保存されます。');
 }
 const quickRatingPending=new Set();
 let detailScoreSaving=false;
-document.querySelectorAll('[data-detail-choice] button[data-score]').forEach(button=>button.addEventListener('click',async()=>{
+document.querySelectorAll('[data-detail-choice] button[data-cycle-field]').forEach(button=>button.addEventListener('click',async()=>{
  if(detailScoreSaving||!detailBook)return;
- const book=detailBook,field=button.closest('[data-detail-choice]').dataset.detailChoice;
- const target=button.dataset.score==='yes';
- const next=book[field]===target?null:target;
+ const book=detailBook,field=button.dataset.cycleField;
+ const next=nextRating(book[field]);
  detailScoreSaving=true;
  document.querySelectorAll('[data-detail-choice] button').forEach(b=>b.disabled=true);
  message('detailScoreMessage','保存中…');
@@ -311,7 +322,7 @@ document.querySelectorAll('[data-detail-choice] button[data-score]').forEach(but
   if(!Array.isArray(changed)||!changed.length)throw Error('別の端末で更新されています。再読み込みしてください。');
   Object.assign(book,changed[0]);detailBook=book;
   updateDetailChoices(book);render();
-  message('detailScoreMessage','保存しました。選択済みをもう一度押すと未評価に戻ります。','ok');
+  message('detailScoreMessage','保存しました。続けてタップすると次の評価へ切り替わります。','ok');
  }catch(e){
   message('detailScoreMessage','保存できませんでした: '+String(e.message||e),'error');
  }finally{
