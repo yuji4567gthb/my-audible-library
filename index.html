@@ -65,6 +65,17 @@ main{max-width:1320px}
 .detailchoices button.selected{border-color:#222;background:#222;color:#fff}
 .detailchoices button:disabled{opacity:.55;cursor:wait}
 @media(max-width:360px){.detailchoices{gap:5px}.detailchoices button{font-size:12px;padding:9px 4px}}
+
+/* Responsive grouping: the group is a local browse aid, not an Audible taxonomy claim. */
+.toolbar{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));align-items:stretch}
+.toolbar #categoryGroup,.toolbar #categoryFilter{min-width:0}
+@media(max-width:620px){
+ .toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .toolbar #search{grid-column:1/-1}
+ .toolbar select{font-size:13px;padding:10px 8px}
+ .toolbar #categoryGroup,.toolbar #categoryFilter{grid-column:auto}
+ .detailchoices button{min-height:48px}
+}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
@@ -74,10 +85,10 @@ main{max-width:1320px}
 <select id="sort"><option value="new">登録順</option><option value="title">タイトル順</option><option value="author">著者順</option><option value="finished">聴了日順</option></select>
 <select id="filter"><option value="all">作品：すべて</option><option value="yes">また聴きたい</option><option value="no">一度で十分</option><option value="unset">作品：未評価</option></select>
 <select id="voiceFilter"><option value="all">ナレーター：すべて</option><option value="yes">好き</option><option value="no">好みではない</option><option value="unset">ナレーター：未評価</option></select>
-<select id="categoryFilter" aria-label="カテゴリで絞り込み"><option value="">カテゴリ：すべて</option></select>
+<select id="categoryGroup" aria-label="表示用カテゴリグループ"><option value="">分類グループ：すべて</option></select><select id="categoryFilter" aria-label="Audibleカテゴリで絞り込み"><option value="">カテゴリ：すべて</option></select>
 </div>
 <div class="viewbar"><span class="muted">表示：</span><div class="viewbuttons" role="group" aria-label="本棚の表示方法"><button type="button" data-view="grid" class="active">▦ グリッド</button><button type="button" data-view="list">☷ リスト</button><button type="button" data-view="detail">☰ 詳細</button></div></div>
-<div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><div id="categoryProgressWrap" class="hidden" style="margin:10px 0"><progress id="categoryProgress" max="1" value="0" style="width:100%" aria-label="カテゴリ一括補完の進捗"></progress></div><details id="categoryDiagnosticPanel" class="hidden"><summary>カテゴリ取得の詳しい診断結果</summary><p class="muted">カテゴリリンクとページ中の表示を記録したものです。ログイン情報は含めません。</p><textarea id="categoryDiagnostics" readonly aria-label="診断結果"></textarea><button id="copyCategoryDiagnostics" type="button" class="alt">診断結果をコピー</button></details><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
+<div id="groupActive" class="authorfilter hidden"><span id="groupActiveText"></span><button id="clearGroup" type="button">× グループ解除</button></div><div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><div id="categoryProgressWrap" class="hidden" style="margin:10px 0"><progress id="categoryProgress" max="1" value="0" style="width:100%" aria-label="カテゴリ一括補完の進捗"></progress></div><details id="categoryDiagnosticPanel" class="hidden"><summary>カテゴリ取得の詳しい診断結果</summary><p class="muted">カテゴリリンクとページ中の表示を記録したものです。ログイン情報は含めません。</p><textarea id="categoryDiagnostics" readonly aria-label="診断結果"></textarea><button id="copyCategoryDiagnostics" type="button" class="alt">診断結果をコピー</button></details><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
 <div id="detailOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
 <div class="dialog">
 <div class="detailhead"><h2 id="detailTitle"></h2><button type="button" id="detailClose" class="alt" aria-label="閉じる">閉じる</button></div>
@@ -103,7 +114,7 @@ main{max-width:1320px}
 <script>
 'use strict';
 const BASE='https://yqjemihzbuuhxsoyzkii.supabase.co',KEY='sb_publishable_v_klJ4gjzQ_K6BNtgB-AXA_oiuGb37W',el=id=>document.getElementById(id);
-let session=null,books=[],editing=null,viewMode=localStorage.getItem('my_audible_view')||'grid',repeatChoice=null,voiceChoice=null,selectedAuthor=null,selectedCategory=null,detailBook=null;
+let session=null,books=[],editing=null,viewMode=localStorage.getItem('my_audible_view')||'grid',repeatChoice=null,voiceChoice=null,selectedAuthor=null,selectedCategory=null,selectedGroup=null,detailBook=null;
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const message=(id,s,kind='')=>{el(id).textContent=s;el(id).className=kind||'muted'};
 async function api(path,options={}){
@@ -146,15 +157,43 @@ function parseCategoryLines(str){
  }
  return normalCategories(result);
 }
+// These are UI-only browsing groups, NOT Audible's verified parent categories.
+const displayGroups={
+ '文芸・文学':['大衆小説','現代文学','文芸小説','世界文学','歴史小説','アジア','成長','家庭生活'],
+ 'ミステリー・サスペンス':['ミステリー','スリラー・サスペンス','サスペンス','警察','ハードボイルド','ホラー','犯罪スリラー','テクノスリラー'],
+ 'ファンタジー':['ファンタジー'],
+ 'ビジネス・仕事':['マネジメント・リーダーシップ','マネジメント','リーダーシップ','事業開発','事業開発・起業','出世','政治'],
+ '自己啓発・学習':['自己啓発','モチベーション・自己啓発','タイムマネジメント・生産性'],
+ 'テクノロジー':['コンピュータサイエンス','機械理論・人工知能'],
+ '芸術・エンタメ':['コメディー・パフォーマンスアート','エンターテインメント・有名人','作曲家・音楽家']
+};
+const groupForCategory=name=>Object.entries(displayGroups).find(([,names])=>names.includes(name))?.[0]||'その他';
+const bookCategoryNames=b=>normalCategories(b.audible_categories).flatMap(c=>[c.category,...(c.subcategory?[c.subcategory]:[])]);
 function updateCategoryOptions(){
- const selection=el('categoryFilter').value;
- const names=[...new Set(books.flatMap(b=>normalCategories(b.audible_categories).flatMap(c=>[c.category,...(c.subcategory?[c.subcategory]:[])])))].sort((a,b)=>a.localeCompare(b,'ja'));
- el('categoryFilter').innerHTML='<option value="">カテゴリ：すべて</option>'+names.map(n=>'<option value="'+escapeHTML(n)+'">'+escapeHTML(n)+'</option>').join('');
- el('categoryFilter').value=names.includes(selection)?selection:'';
+ const names=[...new Set(books.flatMap(bookCategoryNames))].sort((a,b)=>a.localeCompare(b,'ja'));
+ const oldCat=selectedCategory;
+ const oldGroup=selectedGroup;
+ const groups=[...new Set(names.map(groupForCategory))].sort((a,b)=>a.localeCompare(b,'ja'));
+ const groupCounts=Object.fromEntries(groups.map(g=>[g,books.filter(b=>bookCategoryNames(b).some(n=>groupForCategory(n)===g)).length]));
+ el('categoryGroup').innerHTML='<option value="">分類グループ：すべて</option>'+groups.map(g=>'<option value="'+escapeHTML(g)+'">'+escapeHTML(g)+'（'+groupCounts[g]+'冊）</option>').join('');
+ selectedGroup=groups.includes(oldGroup)?oldGroup:null;
+ el('categoryGroup').value=selectedGroup||'';
+ const filtered=names.filter(n=>!selectedGroup||groupForCategory(n)===selectedGroup);
+ const counts=Object.fromEntries(filtered.map(n=>[n,books.filter(b=>bookCategoryNames(b).includes(n)).length]));
+ el('categoryFilter').innerHTML='<option value="">カテゴリ：すべて</option>'+filtered.map(n=>'<option value="'+escapeHTML(n)+'">'+escapeHTML(n)+'（'+counts[n]+'冊）</option>').join('');
+ selectedCategory=filtered.includes(oldCat)?oldCat:null;
+ el('categoryFilter').value=selectedCategory||'';
 }
+el('categoryGroup').onchange=()=>{
+ selectedGroup=el('categoryGroup').value||null;
+ selectedCategory=null;
+ updateCategoryOptions();render();
+};
+el('clearGroup').onclick=()=>{selectedGroup=null;selectedCategory=null;updateCategoryOptions();render()};
 function filterCategory(category){
  selectedCategory=category;
- el('categoryFilter').value=category;
+ selectedGroup=groupForCategory(category);
+ updateCategoryOptions();
  el('detailOverlay').classList.add('hidden');
  el('search').value='';el('filter').value='all';el('voiceFilter').value='all';
  render();window.scrollTo({top:0,behavior:'smooth'});
@@ -164,10 +203,10 @@ el('categoryFilter').onchange=()=>{selectedCategory=el('categoryFilter').value||
 function render(){
  const q=el('search').value.trim().toLowerCase(),f=el('filter').value,vf=el('voiceFilter').value,s=el('sort').value;
  const matches=(val,filter)=>filter==='all'||(filter==='yes'?val===true:filter==='no'?val===false:val===null||val===undefined);
- const list=books.filter(b=>(!selectedAuthor||(b.authors||[]).some(a=>a.trim()===selectedAuthor))&&(!selectedCategory||normalCategories(b.audible_categories).some(c=>c.category===selectedCategory||c.subcategory===selectedCategory))&&[b.title,...(b.authors||[]),...(b.narrators||[]),b.genre,b.description].join(' ').toLowerCase().includes(q))
+ const list=books.filter(b=>(!selectedAuthor||(b.authors||[]).some(a=>a.trim()===selectedAuthor))&&(!selectedGroup||bookCategoryNames(b).some(n=>groupForCategory(n)===selectedGroup))&&(!selectedCategory||bookCategoryNames(b).includes(selectedCategory))&&[b.title,...(b.authors||[]),...(b.narrators||[]),b.genre,b.description].join(' ').toLowerCase().includes(q))
  .filter(b=>matches(b.listen_again,f)&&matches(b.narrator_liked,vf));
  list.sort((a,b)=>s==='title'?a.title.localeCompare(b.title,'ja'):s==='author'?(a.authors?.[0]||'').localeCompare(b.authors?.[0]||'','ja'):s==='finished'?(b.finished_on||'').localeCompare(a.finished_on||''):(b.created_at||'').localeCompare(a.created_at||''));
- el('authorFilter').classList.toggle('hidden',!selectedAuthor);el('authorFilterText').textContent=selectedAuthor?'著者：'+selectedAuthor+'（'+list.length+'冊）':'';el('categoryActive').classList.toggle('hidden',!selectedCategory);el('categoryActiveText').textContent=selectedCategory?'カテゴリ：'+selectedCategory+'（'+list.length+'冊）':'';message('count',books.length+'冊 登録済み');el('empty').classList.toggle('hidden',list.length>0);
+ el('authorFilter').classList.toggle('hidden',!selectedAuthor);el('authorFilterText').textContent=selectedAuthor?'著者：'+selectedAuthor+'（'+list.length+'冊）':'';el('groupActive').classList.toggle('hidden',!selectedGroup);el('groupActiveText').textContent=selectedGroup?'表示用グループ：'+selectedGroup+'（'+list.length+'冊）':'';el('categoryActive').classList.toggle('hidden',!selectedCategory);el('categoryActiveText').textContent=selectedCategory?'カテゴリ：'+selectedCategory+'（'+list.length+'冊）':'';message('count',books.length+'冊 登録済み');el('empty').classList.toggle('hidden',list.length>0);
  el('books').className='grid'+(viewMode==='list'?' list-mode':viewMode==='detail'?' detail-mode':'');
  document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===viewMode;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active))});
  const tag=(val,yes,no)=>'<span class="scoretag '+(val===true?'positive':val===false?'negative':'')+'">'+escapeHTML(val===true?yes:val===false?no:'未評価')+'</span>';
@@ -234,8 +273,6 @@ function showDetail(book){
  el('detailNarrators').textContent=(book.narrators||[]).join('、')||'未登録';
  el('detailFinished').textContent=book.finished_on||'未設定';
  updateDetailChoices(book);el('detailCategories').innerHTML=normalCategories(book.audible_categories).map(c=>'<button type="button" class="categorylink" data-category="'+escapeHTML(c.category)+'">'+escapeHTML(c.category)+'</button>'+(c.subcategory?'<button type="button" class="categorylink" data-category="'+escapeHTML(c.subcategory)+'">› '+escapeHTML(c.subcategory)+'</button>':'')).join('')||'<span class="muted">未登録</span>';el('detailCategories').querySelectorAll('.categorylink').forEach(btn=>btn.addEventListener('click',()=>filterCategory(btn.dataset.category)));
- el('detailRepeat').textContent=book.listen_again===true?'↻ また聴きたい':book.listen_again===false?'一度で十分':'未評価';
- el('detailVoice').textContent=book.narrator_liked===true?'👍 好き':book.narrator_liked===false?'👎 好みではない':'未評価';
  el('detailDescription').textContent=book.description||'未登録';
  
  el('detailAudible').classList.toggle('hidden',!book.audible_url);
