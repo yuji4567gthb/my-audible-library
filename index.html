@@ -105,6 +105,9 @@ main{max-width:1320px}
 .detailchoices{display:block}
 .detailchoices .cycle-score{width:100%;text-align:center;min-height:48px}
 @media(min-width:701px){.grid.list-mode .quickratings,.grid.detail-mode .quickratings{grid-column:3}}
+.detailrating{display:inline-block;margin-top:5px;padding:7px 11px;border-radius:7px;background:#f3f3f1;color:#666;font-size:13px}
+.detailrating.positive{background:#e6f2eb;color:#17643d}
+.detailrating.negative{background:#f5eceb;color:#88443f}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
@@ -127,11 +130,8 @@ main{max-width:1320px}
 <div class="detailfield"><strong>聴了日</strong><span id="detailFinished"></span></div>
 <div class="detailfield"><strong>カテゴリ / サブカテゴリ</strong><div id="detailCategories" class="categorybuttons"></div></div>
 </div></div>
-<div class="detailfield"><strong>作品の評価</strong>
-<div class="detailchoices" data-detail-choice="listen_again"><button type="button" class="cycle-score" data-cycle-field="listen_again">未評価</button></div></div>
-<div class="detailfield"><strong>ナレーションの評価</strong>
-<div class="detailchoices" data-detail-choice="narrator_liked"><button type="button" class="cycle-score" data-cycle-field="narrator_liked">未評価</button></div></div>
-<p id="detailScoreMessage" class="muted" role="status" aria-live="polite">タップするたびに「肯定 → 否定 → 未評価」と変わり、自動保存されます。</p>
+<div class="detailfield"><strong>作品の評価</strong><span id="detailRepeat" class="detailrating">未評価</span></div>
+<div class="detailfield"><strong>ナレーションの評価</strong><span id="detailVoice" class="detailrating">未評価</span></div>
 <div class="detailsection"><h3>概要</h3><div id="detailDescription" class="muted"></div></div>
 
 <div class="actions" style="margin-top:22px"><button type="button" class="alt hidden" id="detailAudible">Audibleで開く</button><button type="button" id="detailEdit">編集</button></div>
@@ -298,38 +298,16 @@ function ratingLabel(field,value){
  return value===true?'👍 好き':value===false?'👎 好みでない':'－ 未評価';
 }
 function updateDetailChoices(book){
- for(const button of document.querySelectorAll('[data-cycle-field]')){
-  const field=button.dataset.cycleField;
-  button.textContent=ratingLabel(field,book[field]);
-  button.classList.toggle('positive',book[field]===true);
-  button.classList.toggle('negative',book[field]===false);
-  button.classList.toggle('unrated',book[field]===null||book[field]===undefined);
-  button.setAttribute('aria-label',ratingLabel(field,book[field])+'。タップして次の評価へ');
+ const values=[['detailRepeat','listen_again'],['detailVoice','narrator_liked']];
+ for(const [id,field] of values){
+  const target=el(id),value=book[field];
+  target.textContent=ratingLabel(field,value);
+  target.classList.toggle('positive',value===true);
+  target.classList.toggle('negative',value===false);
+  target.classList.toggle('unrated',value===null||value===undefined);
  }
- message('detailScoreMessage','タップするたびに「肯定 → 否定 → 未評価」と変わり、自動保存されます。');
 }
 const quickRatingPending=new Set();
-let detailScoreSaving=false;
-document.querySelectorAll('[data-detail-choice] button[data-cycle-field]').forEach(button=>button.addEventListener('click',async()=>{
- if(detailScoreSaving||!detailBook)return;
- const book=detailBook,field=button.dataset.cycleField;
- const next=nextRating(book[field]);
- detailScoreSaving=true;
- document.querySelectorAll('[data-detail-choice] button').forEach(b=>b.disabled=true);
- message('detailScoreMessage','保存中…');
- try{
-  const changed=await authed('/rest/v1/books?id=eq.'+encodeURIComponent(book.id)+'&revision=eq.'+book.revision,{method:'PATCH',body:{[field]:next},prefer:'return=representation'});
-  if(!Array.isArray(changed)||!changed.length)throw Error('別の端末で更新されています。再読み込みしてください。');
-  Object.assign(book,changed[0]);detailBook=book;
-  updateDetailChoices(book);render();
-  message('detailScoreMessage','保存しました。続けてタップすると次の評価へ切り替わります。','ok');
- }catch(e){
-  message('detailScoreMessage','保存できませんでした: '+String(e.message||e),'error');
- }finally{
-  detailScoreSaving=false;
-  document.querySelectorAll('[data-detail-choice] button').forEach(b=>b.disabled=false);
- }
-}));
 function showDetail(book){
  if(!book)return;
  detailBook=book;
