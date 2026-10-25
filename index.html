@@ -108,6 +108,16 @@ main{max-width:1320px}
 .detailrating{display:inline-block;margin-top:5px;padding:7px 11px;border-radius:7px;background:#f3f3f1;color:#666;font-size:13px}
 .detailrating.positive{background:#e6f2eb;color:#17643d}
 .detailrating.negative{background:#f5eceb;color:#88443f}
+
+/* Compact clickable rating chips (same scale as former scoretags). */
+.quickratings{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:5px;width:100%;min-width:0}
+.quickratings .quickscore{width:auto;min-width:0;min-height:26px;padding:4px 7px;font-size:11px;line-height:1.2;white-space:normal;text-align:left;border-radius:6px;border:1px solid transparent;background:#f0f0ee;color:#555}
+.quickratings .quickscore.positive{background:#e6f2eb;color:#17643d;border-color:transparent}
+.quickratings .quickscore.negative{background:#f5eceb;color:#88443f;border-color:transparent}
+.grid.list-mode .book,.grid.detail-mode .book{grid-template-columns:54px minmax(0,1fr) minmax(105px,200px)}
+.grid.detail-mode .book{grid-template-columns:90px minmax(0,1fr) minmax(105px,210px)}
+.grid.list-mode .quickratings,.grid.detail-mode .quickratings{display:flex;grid-column:3;grid-row:1/span 4;margin:0;align-self:center}
+@media(max-width:700px){.grid.list-mode .book,.grid.detail-mode .book{grid-template-columns:54px minmax(0,1fr)}.grid.detail-mode .book{grid-template-columns:75px minmax(0,1fr)}.grid.list-mode .quickratings,.grid.detail-mode .quickratings{grid-column:2;grid-row:auto;margin-top:4px}}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
@@ -239,8 +249,8 @@ function render(){
  el('books').className='grid'+(viewMode==='list'?' list-mode':viewMode==='detail'?' detail-mode':'');
  document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===viewMode;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active))});
  const quickScores=book=>'<div class="quickratings" aria-label="作品とナレーターの評価">'+
-  '<div class="quickratinglabel">作品</div><button type="button" class="quickscore cycle-score" data-quick-field="listen_again" aria-label="'+escapeHTML(book.title+'：作品の評価 '+ratingLabel('listen_again',book.listen_again))+'">'+escapeHTML(ratingLabel('listen_again',book.listen_again))+'</button>'+
-  '<div class="quickratinglabel">ナレーション</div><button type="button" class="quickscore cycle-score" data-quick-field="narrator_liked" aria-label="'+escapeHTML(book.title+'：ナレーションの評価 '+ratingLabel('narrator_liked',book.narrator_liked))+'">'+escapeHTML(ratingLabel('narrator_liked',book.narrator_liked))+'</button></div>';
+  '<button type="button" class="quickscore cycle-score '+(book.listen_again===true?'positive':book.listen_again===false?'negative':'unrated')+'" data-quick-field="listen_again" aria-label="'+escapeHTML(book.title+'：作品の評価 '+ratingLabel('listen_again',book.listen_again)+'。押すと切り替え')+'">'+escapeHTML(ratingLabel('listen_again',book.listen_again))+'</button>'+
+  '<button type="button" class="quickscore cycle-score '+(book.narrator_liked===true?'positive':book.narrator_liked===false?'negative':'unrated')+'" data-quick-field="narrator_liked" aria-label="'+escapeHTML(book.title+'：ナレーションの評価 '+ratingLabel('narrator_liked',book.narrator_liked)+'。押すと切り替え')+'">'+escapeHTML(ratingLabel('narrator_liked',book.narrator_liked))+'</button></div>';
  el('books').innerHTML=list.map(b=>'<article class="book" role="button" tabindex="0" aria-label="'+escapeHTML(b.title)+'の詳細を開く" data-id="'+escapeHTML(b.id)+'">'+
  (b.cover_url?'<img class="cover" loading="lazy" src="'+escapeHTML(b.cover_url)+'" alt="">':'<div class="cover placeholder">表紙なし</div>')+
  '<div class="bookname">'+escapeHTML(b.title)+'</div><div class="muted">'+(b.authors||[]).map(a=>'<button type="button" class="authorlink" data-author="'+escapeHTML(a)+'">'+escapeHTML(a)+'</button>').join('、')+'</div>'+
