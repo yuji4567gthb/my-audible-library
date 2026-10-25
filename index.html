@@ -57,6 +57,8 @@ main{max-width:1320px}
 .categorybuttons{display:flex;flex-wrap:wrap;gap:4px}
 .categoryhint{font-size:12px;color:#777}
 @media(max-width:620px){header>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}}
+
+#categoryDiagnostics{width:100%;min-height:210px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.5;white-space:pre;resize:vertical}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
@@ -69,7 +71,7 @@ main{max-width:1320px}
 <select id="categoryFilter" aria-label="カテゴリで絞り込み"><option value="">カテゴリ：すべて</option></select>
 </div>
 <div class="viewbar"><span class="muted">表示：</span><div class="viewbuttons" role="group" aria-label="本棚の表示方法"><button type="button" data-view="grid" class="active">▦ グリッド</button><button type="button" data-view="list">☷ リスト</button><button type="button" data-view="detail">☰ 詳細</button></div></div>
-<div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
+<div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><details id="categoryDiagnosticPanel" class="hidden"><summary>カテゴリ取得の詳しい診断結果</summary><p class="muted">カテゴリリンクとページ中の表示を記録したものです。ログイン情報は含めません。</p><textarea id="categoryDiagnostics" readonly aria-label="診断結果"></textarea><button id="copyCategoryDiagnostics" type="button" class="alt">診断結果をコピー</button></details><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
 <div id="detailOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
 <div class="dialog">
 <div class="detailhead"><h2 id="detailTitle"></h2><button type="button" id="detailClose" class="alt" aria-label="閉じる">閉じる</button></div>
@@ -287,14 +289,14 @@ el('enrichCategories').onclick=async()=>{
  if(!candidates.length){message('notice','カテゴリが空欄の作品はありません。');return}
  if(!confirm('今回 '+candidates.length+'冊のAudible掲載カテゴリを確認します。カテゴリが取得できない作品は空欄のままにし、既存情報は変更しません。よろしいですか？'))return;
  btn.dataset.working='yes';btn.textContent='補完を中断';cancelCategoryEnrich=false;
- let updated=0,empty=0,failed=0,examples=[];
+ let updated=0,empty=0,failed=0,examples=[];el("categoryDiagnosticPanel").classList.add("hidden");
  for(let i=0;i<candidates.length;i++){
   if(cancelCategoryEnrich)break;
   const b=candidates[i];message('notice','カテゴリ取得中 '+(i+1)+' / '+candidates.length+'（取得 '+updated+'、該当なし '+empty+'、エラー '+failed+'）');
   try{
    const meta=await authed('/functions/v1/audible-metadata',{method:'POST',body:{url:b.audible_url||'https://www.audible.co.jp/pd/'+b.audible_id}});
    const cats=normalCategories(meta.audible_categories);
-   if(!cats.length&&examples.length<3)examples.push({title:b.title,diagnostic:meta.category_diagnostics||null,status:meta.status||null,partial:!!meta.partial});
+   if(!cats.length&&examples.length<3)examples.push({title:b.title,audible_id:b.audible_id,diagnostic:meta.category_diagnostics||null,status:meta.status||null,partial:!!meta.partial});
    // Fetch may be unsuccessful; do not mark such entries checked, so retries remain possible.
    if(meta.partial&&meta.notice?.includes('取得できません')){failed++;continue}
    const patch={audible_categories_checked_at:new Date().toISOString()};
@@ -311,7 +313,13 @@ el('enrichCategories').onclick=async()=>{
  await load();
  const report='カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。'+(updated===0?'最初の3冊で取得できなかったため自動停止しました。':'')+' 診断：'+examples.map(x=>x.title+' [ページ文字数='+String(x.diagnostic?.pageBytes??'不明')+'、カテゴリリンク='+String((x.diagnostic?.categoryNodeLinks||0)+(x.diagnostic?.categoryPathLinks||0))+'、ジャンル構造化データ='+String(!!x.diagnostic?.genreProvided)+'、HTTP='+String(x.status||'不明')+']').join(' / ');
  message('notice',report);
+ if(examples.length){
+  el('categoryDiagnosticPanel').classList.remove('hidden');
+  el('categoryDiagnostics').value=JSON.stringify({date:new Date().toISOString(),samples:examples},null,2);
+ }
+
 };
+el('copyCategoryDiagnostics').onclick=async()=>{const txt=el('categoryDiagnostics').value;try{await navigator.clipboard.writeText(txt);message('notice','診断結果をコピーしました。')}catch{el('categoryDiagnostics').select();message('notice','診断内容を選択しました。コピーして共有してください。')}};
 el('bulkImport').onclick=()=>el('importFile').click();
 el('importFile').onchange=async e=>{
  const file=e.target.files?.[0];e.target.value='';if(!file)return;
