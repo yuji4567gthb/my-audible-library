@@ -287,13 +287,14 @@ el('enrichCategories').onclick=async()=>{
  if(!candidates.length){message('notice','カテゴリが空欄の作品はありません。');return}
  if(!confirm('今回 '+candidates.length+'冊のAudible掲載カテゴリを確認します。カテゴリが取得できない作品は空欄のままにし、既存情報は変更しません。よろしいですか？'))return;
  btn.dataset.working='yes';btn.textContent='補完を中断';cancelCategoryEnrich=false;
- let updated=0,empty=0,failed=0;
+ let updated=0,empty=0,failed=0,examples=[];
  for(let i=0;i<candidates.length;i++){
   if(cancelCategoryEnrich)break;
   const b=candidates[i];message('notice','カテゴリ取得中 '+(i+1)+' / '+candidates.length+'（取得 '+updated+'、該当なし '+empty+'、エラー '+failed+'）');
   try{
    const meta=await authed('/functions/v1/audible-metadata',{method:'POST',body:{url:b.audible_url||'https://www.audible.co.jp/pd/'+b.audible_id}});
    const cats=normalCategories(meta.audible_categories);
+   if(!cats.length&&examples.length<3)examples.push({title:b.title,diagnostic:meta.category_diagnostics||null,status:meta.status||null,partial:!!meta.partial});
    // Fetch may be unsuccessful; do not mark such entries checked, so retries remain possible.
    if(meta.partial&&meta.notice?.includes('取得できません')){failed++;continue}
    const patch={audible_categories_checked_at:new Date().toISOString()};
@@ -302,11 +303,14 @@ el('enrichCategories').onclick=async()=>{
    if(!updatedRows.length){failed++;continue}
    if(cats.length)updated++;else empty++;
    Object.assign(b,updatedRows[0]);
+   // Avoid repeated unproductive calls if product pages contain no category metadata.
+   if(i>=2&&updated===0)break;
   }catch(e){failed++}
  }
  btn.dataset.working='';btn.textContent='カテゴリを一括補完';
  await load();
- message('notice','カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。カテゴリが空欄の作品は再実行できます。');
+ const report='カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。'+(updated===0?'最初の3冊で取得できなかったため自動停止しました。':'')+' 診断：'+examples.map(x=>x.title+' [ページ文字数='+String(x.diagnostic?.pageBytes??'不明')+'、カテゴリリンク='+String((x.diagnostic?.categoryNodeLinks||0)+(x.diagnostic?.categoryPathLinks||0))+'、ジャンル構造化データ='+String(!!x.diagnostic?.genreProvided)+'、HTTP='+String(x.status||'不明')+']').join(' / ');
+ message('notice',report);
 };
 el('bulkImport').onclick=()=>el('importFile').click();
 el('importFile').onchange=async e=>{
