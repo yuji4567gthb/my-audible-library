@@ -190,7 +190,7 @@ function showDetail(book){
  el('detailAuthors').querySelectorAll('.authorlink').forEach(b=>b.addEventListener('click',()=>filterAuthor(b.dataset.author)));
  el('detailNarrators').textContent=(book.narrators||[]).join('、')||'未登録';
  el('detailFinished').textContent=book.finished_on||'未設定';
- el('detailGenre').textContent=book.genre||'未登録';el('detailCategories').innerHTML=normalCategories(book.audible_categories).map(c=>'<button type="button" class="categorylink" data-category="'+escapeHTML(c.category)+'">'+escapeHTML(categoryLabel(c))+'</button>').join('')||'<span class="muted">未登録</span>';el('detailCategories').querySelectorAll('.categorylink').forEach(btn=>btn.addEventListener('click',()=>filterCategory(btn.dataset.category)));
+ el('detailGenre').textContent=book.genre||'未登録';el('detailCategories').innerHTML=normalCategories(book.audible_categories).map(c=>'<button type="button" class="categorylink" data-category="'+escapeHTML(c.category)+'">'+escapeHTML(c.category)+'</button>'+(c.subcategory?'<button type="button" class="categorylink" data-category="'+escapeHTML(c.subcategory)+'">› '+escapeHTML(c.subcategory)+'</button>':'')).join('')||'<span class="muted">未登録</span>';el('detailCategories').querySelectorAll('.categorylink').forEach(btn=>btn.addEventListener('click',()=>filterCategory(btn.dataset.category)));
  el('detailRepeat').textContent=book.listen_again===true?'↻ また聴きたい':book.listen_again===false?'一度で十分':'未評価';
  el('detailVoice').textContent=book.narrator_liked===true?'👍 好き':book.narrator_liked===false?'👎 好みではない':'未評価';
  el('detailDescription').textContent=book.description||'未登録';
