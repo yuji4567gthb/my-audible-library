@@ -283,8 +283,8 @@ el('enrichCategories').onclick=async()=>{
  const btn=el('enrichCategories');
  if(btn.dataset.working==='yes'){cancelCategoryEnrich=true;message('notice','現在の作品の取得後に中断します。');return}
  // Only untouched entries. Exclude manual categories to preserve them.
- const candidates=books.filter(b=>b.audible_id&&!b.audible_categories_checked_at&&!normalCategories(b.audible_categories).length).slice(0,20);
- if(!candidates.length){message('notice','カテゴリ未確認の作品はありません。');return}
+ const candidates=books.filter(b=>b.audible_id&&!normalCategories(b.audible_categories).length).sort((a,b)=>(a.audible_categories_checked_at||'').localeCompare(b.audible_categories_checked_at||'')).slice(0,20);
+ if(!candidates.length){message('notice','カテゴリが空欄の作品はありません。');return}
  if(!confirm('今回 '+candidates.length+'冊のAudible掲載カテゴリを確認します。カテゴリが取得できない作品は空欄のままにし、既存情報は変更しません。よろしいですか？'))return;
  btn.dataset.working='yes';btn.textContent='補完を中断';cancelCategoryEnrich=false;
  let updated=0,empty=0,failed=0;
@@ -295,7 +295,7 @@ el('enrichCategories').onclick=async()=>{
    const meta=await authed('/functions/v1/audible-metadata',{method:'POST',body:{url:b.audible_url||'https://www.audible.co.jp/pd/'+b.audible_id}});
    const cats=normalCategories(meta.audible_categories);
    // Fetch may be unsuccessful; do not mark such entries checked, so retries remain possible.
-   if(meta.status||meta.notice?.includes('取得できません')){failed++;continue}
+   if(meta.partial&&meta.notice?.includes('取得できません')){failed++;continue}
    const patch={audible_categories_checked_at:new Date().toISOString()};
    if(cats.length)patch.audible_categories=cats;
    const updatedRows=await authed('/rest/v1/books?id=eq.'+encodeURIComponent(b.id)+'&revision=eq.'+b.revision,{method:'PATCH',body:patch,prefer:'return=representation'});
@@ -306,7 +306,7 @@ el('enrichCategories').onclick=async()=>{
  }
  btn.dataset.working='';btn.textContent='カテゴリを一括補完';
  await load();
- message('notice','カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。未確認作品は再実行できます。');
+ message('notice','カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。カテゴリが空欄の作品は再実行できます。');
 };
 el('bulkImport').onclick=()=>el('importFile').click();
 el('importFile').onchange=async e=>{
