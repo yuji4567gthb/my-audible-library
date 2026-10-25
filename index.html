@@ -118,6 +118,36 @@ main{max-width:1320px}
 .grid.detail-mode .book{grid-template-columns:90px minmax(0,1fr) minmax(105px,210px)}
 .grid.list-mode .quickratings,.grid.detail-mode .quickratings{display:flex;grid-column:3;grid-row:1/span 4;margin:0;align-self:center}
 @media(max-width:700px){.grid.list-mode .book,.grid.detail-mode .book{grid-template-columns:54px minmax(0,1fr)}.grid.detail-mode .book{grid-template-columns:75px minmax(0,1fr)}.grid.list-mode .quickratings,.grid.detail-mode .quickratings{grid-column:2;grid-row:auto;margin-top:4px}}
+
+/* Fixed two-line ratings: no wrapping based on the selected wording. */
+.grid:not(.list-mode):not(.detail-mode) .book{display:flex;flex-direction:column}
+.quickratings,
+.grid.list-mode .quickratings,
+.grid.detail-mode .quickratings{
+ display:grid;
+ grid-template-columns:minmax(0,1fr);
+ grid-template-rows:26px 26px;
+ gap:5px;
+ align-content:end;
+ justify-items:start;
+ min-height:57px;
+ width:100%;
+}
+.grid:not(.list-mode):not(.detail-mode) .quickratings{margin-top:auto;padding-top:5px}
+.quickratings .quickscore{
+ display:block;
+ width:max-content;
+ max-width:100%;
+ min-height:26px;
+ height:26px;
+ line-height:16px;
+ padding:4px 7px;
+ font-size:11px;
+ white-space:nowrap;
+ overflow:hidden;
+ text-overflow:ellipsis;
+}
+.grid.list-mode .quickratings,.grid.detail-mode .quickratings{align-self:center}
 </style></head><body>
 <header><div><h1>My Audible Library</h1><div class="muted" id="count">聴き終わった本の記録</div></div><div><button id="enrichCategories" class="alt hidden" title="Audible掲載カテゴリを未確認の書籍から取得">カテゴリを一括補完</button> <button id="enrich2025" class="alt hidden" title="2025年登録書籍のAudible情報を一括取得">2025年の書籍情報を補完</button> <button id="bulkImport" class="alt hidden">一括登録</button> <button id="add" class="hidden">＋ 登録</button> <button id="logout" class="alt hidden">ログアウト</button></div></header>
 <main><input id="importFile" class="hidden" type="file" accept=".json,application/json" aria-label="一括登録JSON"><section id="auth" class="panel"><h2>ログイン</h2><p class="muted">メールアドレスとパスワードで本棚にアクセスします。</p><form id="authform"><label>メールアドレス<input id="email" type="email" autocomplete="email" required></label><label>パスワード<input id="password" type="password" minlength="6" autocomplete="current-password" required></label><button id="login" type="submit">ログイン</button><button id="signup" type="button" class="alt">新規アカウント登録</button><div id="authmsg" role="status" aria-live="polite" class="muted"></div></form></section>
