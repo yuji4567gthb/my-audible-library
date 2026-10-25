@@ -289,7 +289,7 @@ el('enrichCategories').onclick=async()=>{
  if(!candidates.length){message('notice','カテゴリが空欄の作品はありません。');return}
  if(!confirm('今回 '+candidates.length+'冊のAudible掲載カテゴリを確認します。カテゴリが取得できない作品は空欄のままにし、既存情報は変更しません。よろしいですか？'))return;
  btn.dataset.working='yes';btn.textContent='補完を中断';cancelCategoryEnrich=false;
- let updated=0,empty=0,failed=0,examples=[];el("categoryDiagnosticPanel").classList.add("hidden");
+ let updated=0,empty=0,failed=0,examples=[],errorExamples=[];el("categoryDiagnosticPanel").classList.add("hidden");
  for(let i=0;i<candidates.length;i++){
   if(cancelCategoryEnrich)break;
   const b=candidates[i];message('notice','カテゴリ取得中 '+(i+1)+' / '+candidates.length+'（取得 '+updated+'、該当なし '+empty+'、エラー '+failed+'）');
@@ -307,15 +307,16 @@ el('enrichCategories').onclick=async()=>{
    Object.assign(b,updatedRows[0]);
    // Avoid repeated unproductive calls if product pages contain no category metadata.
    if(i>=2&&updated===0)break;
-  }catch(e){failed++}
+  }catch(e){failed++;if(errorExamples.length<3)errorExamples.push({title:b.title,error:String(e?.message||e)});}
+  if(i>=2&&updated===0&&(failed>=3||empty>=3))break;
  }
  btn.dataset.working='';btn.textContent='カテゴリを一括補完';
  await load();
- const report='カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。'+(updated===0?'最初の3冊で取得できなかったため自動停止しました。':'')+' 診断：'+examples.map(x=>x.title+' [ページ文字数='+String(x.diagnostic?.pageBytes??'不明')+'、カテゴリリンク='+String((x.diagnostic?.categoryNodeLinks||0)+(x.diagnostic?.categoryPathLinks||0))+'、ジャンル構造化データ='+String(!!x.diagnostic?.genreProvided)+'、HTTP='+String(x.status||'不明')+']').join(' / ');
+ const report='カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。'+(updated===0?'最初の3冊で取得できなかったため自動停止しました。':'')+' エラー：'+errorExamples.map(x=>x.title+' '+x.error).join(' / ')+' 診断：'+examples.map(x=>x.title+' [ページ文字数='+String(x.diagnostic?.pageBytes??'不明')+'、カテゴリリンク='+String((x.diagnostic?.categoryNodeLinks||0)+(x.diagnostic?.categoryPathLinks||0))+'、ジャンル構造化データ='+String(!!x.diagnostic?.genreProvided)+'、HTTP='+String(x.status||'不明')+']').join(' / ');
  message('notice',report);
- if(examples.length){
+ if(examples.length||errorExamples.length){
   el('categoryDiagnosticPanel').classList.remove('hidden');
-  el('categoryDiagnostics').value=JSON.stringify({date:new Date().toISOString(),samples:examples},null,2);
+  el('categoryDiagnostics').value=JSON.stringify({date:new Date().toISOString(),samples:examples,errors:errorExamples},null,2);
  }
 
 };
