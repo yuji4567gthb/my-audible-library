@@ -71,7 +71,7 @@ main{max-width:1320px}
 <select id="categoryFilter" aria-label="カテゴリで絞り込み"><option value="">カテゴリ：すべて</option></select>
 </div>
 <div class="viewbar"><span class="muted">表示：</span><div class="viewbuttons" role="group" aria-label="本棚の表示方法"><button type="button" data-view="grid" class="active">▦ グリッド</button><button type="button" data-view="list">☷ リスト</button><button type="button" data-view="detail">☰ 詳細</button></div></div>
-<div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><details id="categoryDiagnosticPanel" class="hidden"><summary>カテゴリ取得の詳しい診断結果</summary><p class="muted">カテゴリリンクとページ中の表示を記録したものです。ログイン情報は含めません。</p><textarea id="categoryDiagnostics" readonly aria-label="診断結果"></textarea><button id="copyCategoryDiagnostics" type="button" class="alt">診断結果をコピー</button></details><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
+<div id="categoryActive" class="authorfilter hidden"><span id="categoryActiveText"></span><button type="button" id="clearCategory">× カテゴリの絞り込みを解除</button></div><div id="authorFilter" class="authorfilter hidden"><span id="authorFilterText"></span><button id="clearAuthor" type="button">× 著者の絞り込みを解除</button></div><p id="notice" class="muted" role="status"></p><div id="categoryProgressWrap" class="hidden" style="margin:10px 0"><progress id="categoryProgress" max="1" value="0" style="width:100%" aria-label="カテゴリ一括補完の進捗"></progress></div><details id="categoryDiagnosticPanel" class="hidden"><summary>カテゴリ取得の詳しい診断結果</summary><p class="muted">カテゴリリンクとページ中の表示を記録したものです。ログイン情報は含めません。</p><textarea id="categoryDiagnostics" readonly aria-label="診断結果"></textarea><button id="copyCategoryDiagnostics" type="button" class="alt">診断結果をコピー</button></details><div id="books" class="grid"></div><p id="empty" class="muted">該当する書籍がありません。</p></section></main>
 <div id="detailOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
 <div class="dialog">
 <div class="detailhead"><h2 id="detailTitle"></h2><button type="button" id="detailClose" class="alt" aria-label="閉じる">閉じる</button></div>
@@ -283,42 +283,56 @@ el('enrich2025').onclick=async()=>{
 let cancelCategoryEnrich=false;
 el('enrichCategories').onclick=async()=>{
  const btn=el('enrichCategories');
- if(btn.dataset.working==='yes'){cancelCategoryEnrich=true;message('notice','現在の作品の取得後に中断します。');return}
- // Only untouched entries. Exclude manual categories to preserve them.
- const candidates=books.filter(b=>b.audible_id&&!normalCategories(b.audible_categories).length).sort((a,b)=>(a.audible_categories_checked_at||'').localeCompare(b.audible_categories_checked_at||'')).slice(0,20);
- if(!candidates.length){message('notice','カテゴリが空欄の作品はありません。');return}
- if(!confirm('今回 '+candidates.length+'冊のAudible掲載カテゴリを確認します。カテゴリが取得できない作品は空欄のままにし、既存情報は変更しません。よろしいですか？'))return;
- btn.dataset.working='yes';btn.textContent='補完を中断';cancelCategoryEnrich=false;
- let updated=0,empty=0,failed=0,examples=[],errorExamples=[];el("categoryDiagnosticPanel").classList.add("hidden");
- for(let i=0;i<candidates.length;i++){
-  if(cancelCategoryEnrich)break;
-  const b=candidates[i];message('notice','カテゴリ取得中 '+(i+1)+' / '+candidates.length+'（取得 '+updated+'、該当なし '+empty+'、エラー '+failed+'）');
-  try{
-   const meta=await authed('/functions/v1/audible-metadata',{method:'POST',body:{url:b.audible_url||'https://www.audible.co.jp/pd/'+b.audible_id}});
-   const cats=normalCategories(meta.audible_categories);
-   if(!cats.length&&examples.length<3)examples.push({title:b.title,audible_id:b.audible_id,diagnostic:meta.category_diagnostics||null,status:meta.status||null,partial:!!meta.partial});
-   // Fetch may be unsuccessful; do not mark such entries checked, so retries remain possible.
-   if(meta.partial&&meta.notice?.includes('取得できません')){failed++;continue}
-   const patch={audible_categories_checked_at:new Date().toISOString()};
-   if(cats.length)patch.audible_categories=cats;
-   const updatedRows=await authed('/rest/v1/books?id=eq.'+encodeURIComponent(b.id)+'&revision=eq.'+b.revision,{method:'PATCH',body:patch,prefer:'return=representation'});
-   if(!updatedRows.length){failed++;continue}
-   if(cats.length)updated++;else empty++;
-   Object.assign(b,updatedRows[0]);
-   // Avoid repeated unproductive calls if product pages contain no category metadata.
-   if(i>=2&&updated===0)break;
-  }catch(e){failed++;if(errorExamples.length<3)errorExamples.push({title:b.title,error:String(e?.message||e)});}
-  if(i>=2&&updated===0&&(failed>=3||empty>=3))break;
+ if(btn.dataset.working==='yes'){
+  cancelCategoryEnrich=true;message('notice','現在の書籍の処理が終わったら中断します。');return;
  }
- btn.dataset.working='';btn.textContent='カテゴリを一括補完';
- await load();
- const report='カテゴリ補完：'+updated+'冊で取得、'+empty+'冊で情報なし、'+failed+'冊で失敗。'+(updated===0?'最初の3冊で取得できなかったため自動停止しました。':'')+' エラー：'+errorExamples.map(x=>x.title+' '+x.error).join(' / ')+' 診断：'+examples.map(x=>x.title+' [ページ文字数='+String(x.diagnostic?.pageBytes??'不明')+'、カテゴリリンク='+String((x.diagnostic?.categoryNodeLinks||0)+(x.diagnostic?.categoryPathLinks||0))+'、ジャンル構造化データ='+String(!!x.diagnostic?.genreProvided)+'、HTTP='+String(x.status||'不明')+']').join(' / ');
- message('notice',report);
- if(examples.length||errorExamples.length){
-  el('categoryDiagnosticPanel').classList.remove('hidden');
-  el('categoryDiagnostics').value=JSON.stringify({date:new Date().toISOString(),samples:examples,errors:errorExamples},null,2);
+ const candidates=books.filter(b=>b.audible_id&&!normalCategories(b.audible_categories).length)
+  .sort((a,b)=>(a.audible_categories_checked_at||'').localeCompare(b.audible_categories_checked_at||''));
+ if(!candidates.length){message('notice','カテゴリ未登録の書籍はありません。');return}
+ if(!confirm('カテゴリ未登録の'+candidates.length+'冊を順番に補完します。完了まで画面を開いたままにしてください。既存のカテゴリ・評価・聴了日などは変更しません。'))return;
+ btn.dataset.working='yes';btn.textContent='■ 補完を中断';cancelCategoryEnrich=false;
+ el('categoryDiagnosticPanel').classList.add('hidden');
+ let updated=0,empty=0,failed=0,attempted=0,consecutiveErrors=0,halted=false;
+ const examples=[],errorExamples=[];
+ const progress=el('categoryProgress');
+ progress.max=candidates.length;progress.value=0;el('categoryProgressWrap').classList.remove('hidden');
+ try{
+  for(const b of candidates){
+   if(cancelCategoryEnrich)break;
+   message('notice','カテゴリ補完中 '+(attempted+1)+' / '+candidates.length+'冊（取得 '+updated+'、情報なし '+empty+'、失敗 '+failed+'）');
+   try{
+    const meta=await authed('/functions/v1/audible-metadata',{method:'POST',body:{url:b.audible_url||'https://www.audible.co.jp/pd/'+b.audible_id}});
+    if(meta.partial&&meta.notice?.includes('取得できません'))throw Error(meta.notice);
+    const cats=normalCategories(meta.audible_categories);
+    if(!cats.length&&examples.length<3)examples.push({title:b.title,audible_id:b.audible_id,diagnostic:meta.category_diagnostics||null,status:meta.status||null,partial:!!meta.partial});
+    const patch={audible_categories_checked_at:new Date().toISOString()};
+    if(cats.length)patch.audible_categories=cats;
+    const saved=await authed('/rest/v1/books?id=eq.'+encodeURIComponent(b.id)+'&revision=eq.'+b.revision,{method:'PATCH',body:patch,prefer:'return=representation'});
+    if(!Array.isArray(saved)||!saved.length)throw Error('他の端末で更新されました。再実行してください。');
+    Object.assign(b,saved[0]);
+    if(cats.length)updated++;else empty++;
+    consecutiveErrors=0;
+   }catch(e){
+    failed++;consecutiveErrors++;
+    if(errorExamples.length<5)errorExamples.push({title:b.title,error:String(e?.message||e)});
+   }
+   attempted++;progress.value=attempted;
+   if(consecutiveErrors>=5){halted=true;break}
+   // Yield to browser rendering and avoid unnecessarily rapid requests to Audible.
+   if(!cancelCategoryEnrich)await new Promise(resolve=>setTimeout(resolve,180));
+  }
+ }finally{
+  btn.dataset.working='';btn.textContent='カテゴリを一括補完';
+  el('categoryProgressWrap').classList.add('hidden');
+  const stopped=cancelCategoryEnrich?'ユーザー操作で中断しました。':halted?'連続5冊のエラーで安全のため中断しました。':'';
+  try{await load()}catch(e){}
+  const remaining=books.filter(b=>b.audible_id&&!normalCategories(b.audible_categories).length).length;
+  message('notice','カテゴリ補完結果：'+attempted+' / '+candidates.length+'冊処理、'+updated+'冊取得、'+empty+'冊で情報なし、'+failed+'冊失敗。残り未登録：'+remaining+'冊。'+stopped);
+  if(examples.length||errorExamples.length){
+   el('categoryDiagnosticPanel').classList.remove('hidden');
+   el('categoryDiagnostics').value=JSON.stringify({date:new Date().toISOString(),attempted,total:candidates.length,updated,empty,failed,stopped,samples:examples,errors:errorExamples},null,2);
+  }
  }
-
 };
 el('copyCategoryDiagnostics').onclick=async()=>{const txt=el('categoryDiagnostics').value;try{await navigator.clipboard.writeText(txt);message('notice','診断結果をコピーしました。')}catch{el('categoryDiagnostics').select();message('notice','診断内容を選択しました。コピーして共有してください。')}};
 el('bulkImport').onclick=()=>el('importFile').click();
